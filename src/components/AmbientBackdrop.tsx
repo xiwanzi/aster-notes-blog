@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { WaterRefraction } from "@/lib/waterRefraction";
 
 export const wallpapers = [
   { file: "wallpaper-rain-corridor.webp", name: "雨夜回廊", tone: "dark" as const },
@@ -8,8 +9,7 @@ export const wallpapers = [
 
 type ThemeTone = "light" | "dark";
 type Star = { x: number; y: number; vx: number; vy: number; radius: number; phase: number; alpha: number };
-type Ripple = { x: number; y: number; born: number; strength: number };
-type Spark = { x: number; y: number; vx: number; vy: number; born: number; color: string };
+type Ripple = { x: number; y: number; born: number; duration: number; maxRadius: number; strength: number };
 type Drop = { x: number; y: number; speed: number; length: number; impact: number };
 
 function createStars(width: number, height: number, mobile: boolean): Star[] {
@@ -27,12 +27,22 @@ function createStars(width: number, height: number, mobile: boolean): Star[] {
 
 export function AmbientBackdrop({ wallpaperIndex, tone }: { wallpaperIndex: number; tone: ThemeTone }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const refractionCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const refractionCanvas = refractionCanvasRef.current;
+    if (!canvas || !refractionCanvas) return;
     const context = canvas.getContext("2d");
     if (!context) return;
+
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    let water: WaterRefraction | null = null;
+    try {
+      water = new WaterRefraction(refractionCanvas, `${basePath}/${wallpapers[wallpaperIndex].file}`);
+    } catch (error) {
+      console.warn("Water refraction fallback:", error);
+    }
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const coarsePointer = window.matchMedia("(pointer: coarse)");
@@ -41,7 +51,6 @@ export function AmbientBackdrop({ wallpaperIndex, tone }: { wallpaperIndex: numb
     let dpr = 1;
     let stars: Star[] = [];
     let ripples: Ripple[] = [];
-    let sparks: Spark[] = [];
     let drops: Drop[] = [];
     let pointer = { x: -1000, y: -1000, active: false };
     let animationFrame = 0;
@@ -64,33 +73,37 @@ export function AmbientBackdrop({ wallpaperIndex, tone }: { wallpaperIndex: numb
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
       stars = createStars(width, height, coarsePointer.matches || width <= 900);
       drops = [];
+      const wallpaperHeight = Math.max(width / 1.59879, height);
+      water?.resize(width, wallpaperHeight, window.devicePixelRatio || 1, coarsePointer.matches || width <= 900);
     };
 
-    const addRipple = (x: number, y: number, strength = 1) => {
-      ripples.push({ x, y, born: performance.now(), strength });
+    const addRipple = (x: number, y: number, kind: "click" | "drop" = "click") => {
+      const click = kind === "click";
+      ripples.push({
+        x,
+        y,
+        born: performance.now(),
+        duration: click ? 560 : 430,
+        maxRadius: Math.min(width, height) * (click ? 0.028 : 0.017) * (0.8 + Math.random() * 0.4),
+        strength: click ? 1 : 0.72,
+      });
       if (ripples.length > 14) ripples.shift();
-    };
-
-    const addSparks = (x: number, y: number) => {
-      const palette = ["#ff78bd", "#7ddfff", "#ffd166", "#b794f6"];
-      for (let index = 0; index < 14; index += 1) {
-        const angle = (index / 14) * Math.PI * 2 + Math.random() * 0.18;
-        const speed = 0.045 + Math.random() * 0.09;
-        sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, born: performance.now(), color: palette[index % palette.length] });
-      }
-      sparks = sparks.slice(-70);
     };
 
     const onPointerMove = (event: PointerEvent) => {
       pointer = { x: event.clientX, y: event.clientY, active: true };
+      water?.move(event.clientX, event.clientY + window.scrollY);
     };
-    const onPointerLeave = () => { pointer.active = false; };
+    const onPointerLeave = () => {
+      pointer.active = false;
+      water?.leave();
+    };
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, option")) return;
-      addRipple(event.clientX, event.clientY, 1.15);
-      if (!reducedMotion.matches) addSparks(event.clientX, event.clientY);
+      addRipple(event.clientX, event.clientY, "click");
+      water?.pulse(event.clientX, event.clientY + window.scrollY, "click");
     };
     const onVisibility = () => {
       paused = document.hidden;
@@ -106,6 +119,7 @@ export function AmbientBackdrop({ wallpaperIndex, tone }: { wallpaperIndex: numb
       if (paused) return;
       const delta = Math.min(48, now - previous);
       previous = now;
+      water?.render(now, coarsePointer.matches || width <= 900);
       context.clearRect(0, 0, width, height);
 
       if (pointer.active) {
@@ -160,32 +174,30 @@ export function AmbientBackdrop({ wallpaperIndex, tone }: { wallpaperIndex: numb
       drops = drops.filter((drop) => {
         drop.y += drop.speed * delta;
         context.beginPath(); context.moveTo(drop.x, drop.y - drop.length); context.lineTo(drop.x - 1, drop.y); context.stroke();
-        if (drop.y >= drop.impact) { addRipple(drop.x, drop.impact, 0.72); return false; }
+        if (drop.y >= drop.impact) {
+          addRipple(drop.x, drop.impact, "drop");
+          water?.pulse(drop.x, drop.impact + window.scrollY, "drop");
+          return false;
+        }
         return true;
       });
 
       ripples = ripples.filter((ripple) => {
         const age = now - ripple.born;
-        if (age > 720) return false;
-        const progress = age / 720;
-        const radius = 8 + (42 + ripple.strength * 18) * (1 - Math.pow(1 - progress, 3));
-        context.strokeStyle = `rgba(${colors.glow},${(1 - progress) * 0.36 * ripple.strength})`;
-        context.lineWidth = 1.2 + (1 - progress) * 1.8;
-        context.beginPath(); context.ellipse(ripple.x, ripple.y, radius, radius * 0.38, 0, 0, Math.PI * 2); context.stroke();
-        return true;
-      });
-
-      sparks = sparks.filter((spark) => {
-        const age = now - spark.born;
-        if (age > 760) return false;
-        spark.x += spark.vx * delta;
-        spark.y += spark.vy * delta;
-        spark.vy += 0.00008 * delta;
-        const opacity = 1 - age / 760;
-        context.globalAlpha = opacity;
-        context.fillStyle = spark.color;
-        context.beginPath(); context.arc(spark.x, spark.y, 1.7 + opacity * 1.4, 0, Math.PI * 2); context.fill();
-        context.globalAlpha = 1;
+        if (age > ripple.duration) return false;
+        const progress = age / ripple.duration;
+        const eased = 1 - Math.pow(1 - progress, 2);
+        const radius = Math.max(1, ripple.maxRadius * (0.3 + eased * 0.7));
+        const alpha = (1 - progress) * 0.36 * Math.sqrt(ripple.strength);
+        const glow = context.createRadialGradient(ripple.x, ripple.y, 0, ripple.x, ripple.y, radius);
+        glow.addColorStop(0, `rgba(${colors.star},${alpha})`);
+        glow.addColorStop(0.42, `rgba(${colors.glow},${alpha * 0.28})`);
+        glow.addColorStop(1, `rgba(${colors.glow},0)`);
+        context.save();
+        context.globalCompositeOperation = tone === "dark" ? "screen" : "source-over";
+        context.fillStyle = glow;
+        context.fillRect(ripple.x - radius, ripple.y - radius, radius * 2, radius * 2);
+        context.restore();
         return true;
       });
 
@@ -208,8 +220,9 @@ export function AmbientBackdrop({ wallpaperIndex, tone }: { wallpaperIndex: numb
       window.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("visibilitychange", onVisibility);
+      water?.destroy();
     };
-  }, [tone]);
+  }, [tone, wallpaperIndex]);
 
   return <>
     <div className="wallpaper-overlay" aria-hidden="true">
@@ -219,6 +232,7 @@ export function AmbientBackdrop({ wallpaperIndex, tone }: { wallpaperIndex: numb
           key={wallpaper.file}
           style={{ backgroundImage: `url("${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/${wallpaper.file}")` }}
         />)}
+        <canvas ref={refractionCanvasRef} className="starlake-refraction-canvas" />
         <div className="wallpaper-dim" />
         <div className="wallpaper-vignette" />
       </div>

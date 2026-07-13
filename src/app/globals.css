@@ -69,14 +69,19 @@ svg { display: block; }
 }
 .wallpaper-frames { position: absolute; inset: 0 0 auto; height: var(--wallpaper-height); overflow: hidden; background: #172129; }
 .wallpaper-frame {
-  position: absolute; inset: 0; opacity: 0; transform: scale(1.015); background-position: top center; background-size: cover;
+  position: absolute; inset: 0; z-index: 0; opacity: 0; transform: scale(1.015); background-position: top center; background-size: cover;
   transition: opacity .72s var(--ease-out), transform 1.4s var(--ease-out); will-change: opacity, transform;
 }
 .wallpaper-frame.is-active { opacity: 1; transform: scale(1); }
-.wallpaper-dim { position: absolute; inset: 0; background: rgba(7, 10, 15, .04); }
+.starlake-refraction-canvas {
+  position: absolute; inset: 0; z-index: 1; display: block; opacity: 0; pointer-events: none;
+  transition: opacity .4s ease;
+}
+.starlake-refraction-canvas[data-ready="true"] { opacity: 1; }
+.wallpaper-dim { position: absolute; inset: 0; z-index: 2; background: rgba(7, 10, 15, .04); }
 :root[data-theme="light"] .wallpaper-dim { background: rgba(255, 247, 244, .04); }
 .wallpaper-vignette {
-  position: absolute; inset: 0;
+  position: absolute; inset: 0; z-index: 3;
   background: radial-gradient(circle at 50% 42%, transparent 24%, rgba(4, 8, 12, .04) 62%, rgba(3, 7, 11, .18) 115%), linear-gradient(180deg, rgba(5,8,12,.04), transparent 35%, rgba(5,8,12,.12));
 }
 .wallpaper-vignette::after {

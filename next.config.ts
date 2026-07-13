@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const basePath = "/aster-notes-blog";
+const basePath = process.env.LOCAL_PREVIEW === "1" ? "" : "/aster-notes-blog";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,

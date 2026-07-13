@@ -2,6 +2,8 @@
 node_modules/
 out/
 .playwright-cli/
+test-results/
+playwright-report/
 output/
 *.log
 *.tsbuildinfo
