@@ -1,0 +1,117 @@
+export type Post = {
+  title: string;
+  summary: string;
+  category: string;
+  tags: string[];
+  date: string;
+  minutes: number;
+  pinned?: boolean;
+};
+
+export const site = {
+  name: "Aster",
+  mark: "A",
+  eyebrow: "A PERSONAL FIELD NOTE",
+  headline: "Make · Learn · Wander",
+  subheadline: "在设计、代码与日常之间，收集那些值得反复翻看的瞬间。",
+  bio: "A quiet place for things I make, learn and notice.",
+  about: "这是一座持续生长的个人数字花园：不追赶更新频率，只记录真正想留下的思考。",
+  since: "2026",
+};
+
+export const categories = [
+  { name: "设计札记", count: 7 },
+  { name: "代码实验", count: 5 },
+  { name: "效率系统", count: 4 },
+  { name: "生活切片", count: 3 },
+  { name: "阅读与观看", count: 2 },
+];
+
+export const tags = [
+  ["Design", 8],
+  ["Frontend", 6],
+  ["Creative Coding", 5],
+  ["Notes", 5],
+  ["Workflow", 4],
+  ["Typography", 3],
+  ["Life", 3],
+  ["Reading", 2],
+] as const;
+
+export const posts: Post[] = [
+  {
+    title: "把个人网站变成一座可以长期维护的数字花园",
+    summary: "从信息架构、内容模型到发布节奏，重新理解个人网站：它不是一次性的作品集，而是一套能跟着人一起生长的系统。",
+    category: "设计札记",
+    tags: ["Design", "Digital Garden", "System"],
+    date: "2026-07-10",
+    minutes: 12,
+    pinned: true,
+  },
+  {
+    title: "让界面安静下来：克制动效的四条判断原则",
+    summary: "动效应该解释变化、保持连续，而不是争抢注意力。记录一套用于审视微交互的简单方法。",
+    category: "设计札记",
+    tags: ["Motion", "UX", "Details"],
+    date: "2026-07-04",
+    minutes: 8,
+    pinned: true,
+  },
+  {
+    title: "从零搭建一套不会拖累写作的内容工作流",
+    summary: "把捕捉、整理、写作和发布拆成不同阶段，用更少的工具降低开始写作的阻力。",
+    category: "效率系统",
+    tags: ["Workflow", "Writing", "Notes"],
+    date: "2026-06-28",
+    minutes: 10,
+    pinned: true,
+  },
+  {
+    title: "一周界面观察：留白不是空白，而是阅读的节拍",
+    summary: "从几个日常产品里收集留白的用法，观察密度、层级和阅读速度之间的关系。",
+    category: "设计札记",
+    tags: ["Layout", "Typography", "UI"],
+    date: "2026-07-12",
+    minutes: 7,
+  },
+  {
+    title: "用 CSS 做一张会呼吸的抽象封面",
+    summary: "不用图片素材，通过渐变、混合模式和少量动画构造一个轻量又有层次的视觉背景。",
+    category: "代码实验",
+    tags: ["CSS", "Creative Coding", "Frontend"],
+    date: "2026-07-08",
+    minutes: 9,
+  },
+  {
+    title: "我如何整理散落在各处的灵感碎片",
+    summary: "一个不追求完美分类的收集系统：先留下，再连接，最后让真正重要的内容浮现出来。",
+    category: "效率系统",
+    tags: ["Notes", "PKM", "Workflow"],
+    date: "2026-07-01",
+    minutes: 6,
+  },
+  {
+    title: "六月书影音：关于城市、创造与缓慢生活",
+    summary: "本月留下印象的两本书、三部影像作品，以及它们共同指向的一种生活尺度。",
+    category: "阅读与观看",
+    tags: ["Reading", "Film", "Monthly"],
+    date: "2026-06-30",
+    minutes: 11,
+  },
+  {
+    title: "一次没有目的地的海边散步",
+    summary: "潮湿的风、傍晚六点的光和一条绕远的路。偶尔放下目标，感受也会重新变得清晰。",
+    category: "生活切片",
+    tags: ["Life", "Walk", "Journal"],
+    date: "2026-06-22",
+    minutes: 5,
+  },
+  {
+    title: "组件不是积木：从语义而不是形状开始设计",
+    summary: "按钮、标签和卡片看起来像可复用形状，但真正稳定的组件边界来自语义、状态和行为。",
+    category: "代码实验",
+    tags: ["Components", "React", "Design System"],
+    date: "2026-06-16",
+    minutes: 13,
+  },
+];
