@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import "misans/lib/Normal/MiSans-Regular.min.css";
+import "misans/lib/Normal/MiSans-Bold.min.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,7 +21,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var r=document.documentElement,m=localStorage.getItem('aster-theme')||'auto',g=localStorage.getItem('aster-blur')!=='false',i=Number(localStorage.getItem('aster-wallpaper')||0),t=['dark','light','dark'][i]||'dark',v=m==='auto'?t:m;r.dataset.theme=v;r.dataset.themeMode=m;r.dataset.wallpaperTone=t;r.classList.add(g?'glass-frosted':'glass-solid');if(!g)r.classList.add('no-blur')}catch(e){document.documentElement.dataset.theme='dark';document.documentElement.dataset.wallpaperTone='dark'}})();` }} />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var r=document.documentElement,m=localStorage.getItem('aster-theme')||'auto',g=localStorage.getItem('aster-blur')!=='false',t='dark',v=m==='auto'?t:m;r.dataset.theme=v;r.dataset.themeMode=m;r.dataset.wallpaperTone=t;r.classList.add(g?'glass-frosted':'glass-solid');if(!g)r.classList.add('no-blur')}catch(e){document.documentElement.dataset.theme='dark';document.documentElement.dataset.wallpaperTone='dark'}})();` }} />
       </head>
       <body>{children}</body>
     </html>

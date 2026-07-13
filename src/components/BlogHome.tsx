@@ -4,12 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { categories, posts, site, tags, type Post } from "@/data/site";
 import { AmbientBackdrop, wallpapers } from "@/components/AmbientBackdrop";
 
+const avatarPath = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/avatar-aster.webp`;
+
 type IconName =
   | "home" | "file" | "user" | "link" | "search" | "music" | "sun" | "moon"
   | "spark" | "menu" | "close" | "arrow" | "clock" | "folder" | "pin"
   | "chart" | "hash" | "calendar" | "mail" | "rss" | "github" | "play"
   | "pause" | "prev" | "next" | "volume" | "list" | "grid" | "chevron"
-  | "monitor" | "image";
+  | "monitor";
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {
@@ -43,7 +45,6 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     grid: <><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></>,
     chevron: <path d="m8 10 4 4 4-4"/>,
     monitor: <><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></>,
-    image: <><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m3 17 5-4 4 3 3-2 6 5"/></>,
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 }
@@ -57,15 +58,15 @@ function SocialRow() {
     <a href="https://github.com" target="_blank" rel="noreferrer" aria-label="GitHub"><Icon name="github"/></a>
     <button aria-label="订阅更新"><Icon name="rss"/></button>
     <button aria-label="发送邮件"><Icon name="mail"/></button>
+    <button aria-label="友链"><Icon name="link"/></button>
   </div>;
 }
 
 function ProfileCard() {
   return <section className="glass-panel profile-card">
-    <div className="avatar" aria-hidden="true"><span>{site.mark}</span></div>
     <h2>{site.name}</h2>
     <p>{site.bio}</p>
-    <div className="profile-stats"><span><b>94</b>天</span><i/><span><b>{posts.length}</b>篇</span></div>
+    <div className="profile-stats"><span><b>62</b>天</span><i/><span><b>18</b>篇</span></div>
     <SocialRow/>
   </section>;
 }
@@ -102,6 +103,7 @@ function MusicCard({ playing, trackIndex, elapsed, onToggle, onPrevious, onNext 
       <button className="play-button" aria-label={playing ? "暂停" : "播放"} onClick={onToggle}><Icon name={playing ? "pause" : "play"}/></button>
       <button aria-label="下一首" onClick={onNext}><Icon name="next"/></button>
     </div>
+    <div className="music-volume" aria-label="音量 70%"><Icon name="volume" size={14}/><i><span/></i></div>
     <div className="track-progress"><i style={{ width: `${Math.min(100, elapsed / track.duration * 100)}%` }}/></div>
     <div className="track-time"><span>{formatTime(elapsed)}</span><span>{formatTime(track.duration)}</span></div>
   </section>;
@@ -123,9 +125,9 @@ function TagCard() {
 
 function StatsCard() {
   const items: [IconName, string, string][] = [
-    ["file", String(posts.length), "文章"], ["folder", String(categories.length), "分类"],
-    ["hash", String(tags.length), "标签"], ["chart", "28.6k", "总字数"],
-    ["clock", "94", "运行天数"], ["calendar", "1", "最后更新(天)"],
+    ["file", "21", "文章"], ["folder", "8", "分类"],
+    ["hash", "55", "标签"], ["chart", "109,591", "总字数"],
+    ["clock", "62", "运行天数"], ["calendar", "14", "最后更新(天)"],
   ];
   return <section className="glass-panel stats-card">
     <SectionTitle icon="chart" title="站点统计"/>
@@ -231,7 +233,7 @@ export function BlogHome() {
   }, [blur, preferencesReady, resolvedTheme, theme, wallpaperIndex]);
 
   useEffect(() => {
-    const phrases = ["Build what you imagine", "Collect what you notice", "Make a home for ideas"];
+    const phrases = ["Build what you want", "Reverse what you see", "Graphics stack traces"];
     let phraseIndex = 0;
     let characterIndex = 0;
     let deleting = false;
@@ -316,7 +318,6 @@ export function BlogHome() {
   };
 
   const cycleTheme = () => setTheme((value) => value === "auto" ? "light" : value === "light" ? "dark" : "auto");
-  const switchWallpaper = () => setWallpaperIndex((value) => (value + 1) % wallpapers.length);
   const themeIcon: IconName = theme === "auto" ? "monitor" : theme === "light" ? "sun" : "moon";
   const themeLabel = theme === "auto" ? "自动主题" : theme === "light" ? "明亮主题" : "暗色主题";
 
@@ -333,7 +334,7 @@ export function BlogHome() {
     <div className="scroll-progress" style={{ transform: `scaleX(${scrollProgress})` }}/>
     <header className="topbar-wrap">
       <nav className="topbar" aria-label="主导航">
-        <button className="brand" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span className="brand-orbit">{site.mark}</span><b>{site.name}</b></button>
+        <button className="brand" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span className="brand-orbit"><img src={avatarPath} alt=""/></span><b>{site.name}</b></button>
         <div className="desktop-nav">
           <button className="active" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><Icon name="home" size={15}/>首页</button>
           <details><summary><Icon name="file" size={15}/>文章</summary><div className="nav-dropdown"><button onClick={() => jump("recent")}>文章归档<span>{posts.length}</span></button>{categories.map((category) => <button key={category.name} onClick={() => jump("recent")}>{category.name}<span>{category.count}</span></button>)}</div></details>
@@ -344,7 +345,6 @@ export function BlogHome() {
           <button onClick={() => setSearchOpen(true)} aria-label="搜索" title="搜索"><Icon name="search"/></button>
           <button className={playing ? "active" : ""} onClick={toggleMusic} aria-label={playing ? "暂停音乐" : "播放音乐"} title="环境音乐"><Icon name="music"/></button>
           <button onClick={cycleTheme} aria-label={`切换主题，当前：${themeLabel}`} title={themeLabel}><Icon name={themeIcon}/></button>
-          <button onClick={switchWallpaper} aria-label={`切换壁纸，当前：${wallpapers[wallpaperIndex].name}`} title={wallpapers[wallpaperIndex].name}><Icon name="image"/></button>
           <button className={`blur-switch ${blur ? "active" : ""}`} onClick={() => setBlur((value) => !value)} aria-label="切换磨砂效果" title={blur ? "磨砂玻璃" : "纯色玻璃"}><Icon name="spark"/></button>
           <button className="mobile-menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="菜单"><Icon name={menuOpen ? "close" : "menu"}/></button>
         </div>
@@ -352,26 +352,24 @@ export function BlogHome() {
       {menuOpen && <div className="mobile-menu"><button onClick={() => jump("pinned")}>文章</button><button onClick={() => jump("about")}>关于</button><button onClick={() => jump("contact")}>联系</button></div>}
     </header>
 
-    <main>
-      <section className="hero" aria-labelledby="hero-title">
-        <div className="hero-copy">
-          <div className="hero-ghost-avatar" aria-hidden="true"><span>{site.mark}</span></div>
-          <h1 id="hero-title"><span>Create</span><em>&amp;</em><span>Chronicle</span></h1>
-          <div className="hero-typewriter" aria-label={typedLine}>{typedLine}<i/></div>
-          <p>{site.subheadline}</p>
-          <div className="hero-stats"><span><b>94</b>天</span><i/><span><b>{posts.length}</b>篇文章</span><i/><span><b>∞</b>灵感</span></div>
-          <div className="hero-actions"><button className="primary-button" onClick={() => jump("pinned")}><Icon name="file"/>浏览文章</button><button className="secondary-button" onClick={() => jump("about")}><Icon name="user"/>关于我</button></div>
-        </div>
-        <button className="scroll-cue" onClick={() => jump("pinned")} aria-label="向下滚动"><Icon name="chevron"/></button>
-      </section>
-
+    <main className="main-content">
       <div className="site-grid">
         <aside className="left-sidebar" aria-label="作者与分类信息">
           <ProfileCard/><NoticeCard/><MusicCard playing={playing} trackIndex={trackIndex} elapsed={elapsed} onToggle={toggleMusic} onPrevious={() => changeTrack(-1)} onNext={() => changeTrack(1)}/><CategoryCard/><TagCard/>
         </aside>
 
         <div className="main-column">
-          <nav className="archive-strip" aria-label="文章分类"><button className="archive-home" aria-label="全部文章"><Icon name="home"/></button><button>归档 <b>{posts.length}</b></button>{categories.slice(0, 3).map((category) => <button key={category.name}>{category.name} <b>{category.count}</b></button>)}<button>更多 <Icon name="arrow" size={14}/></button></nav>
+          <section className="hero" aria-labelledby="hero-title">
+            <div className="hero-copy">
+              <div className="hero-ghost-avatar" aria-hidden="true"><span><img src={avatarPath} alt=""/></span></div>
+              <h1 id="hero-title"><span>Develop</span><em>&amp;</em><span>Deconstruct</span></h1>
+              <div className="hero-typewriter" aria-label={typedLine}>{typedLine}<i/></div>
+              <p>{site.subheadline}</p>
+              <div className="hero-stats"><span><b>62</b>天</span><i/><span><b>21</b>篇文章</span><i/><span><b>∞</b>深度</span></div>
+              <div className="hero-actions"><button className="primary-button" onClick={() => jump("pinned")}><Icon name="file" size={16}/>浏览文章</button><button className="secondary-button" onClick={() => jump("about")}><Icon name="user" size={16}/>关于我</button></div>
+            </div>
+          </section>
+          <nav className="archive-strip" aria-label="文章分类"><button className="archive-home" aria-label="全部文章"><Icon name="home"/></button><button>归档 <b>21</b></button>{categories.slice(0, 3).map((category) => <button key={category.name}>{category.name} <b>{category.count}</b></button>)}<button>更多 <Icon name="arrow" size={14}/></button></nav>
 
           <section className="content-section pinned-section" id="pinned">
             <div className="content-heading"><h2>置顶文章</h2><span>EDITOR&apos;S PICK</span></div>
@@ -399,6 +397,7 @@ export function BlogHome() {
     </footer>
 
     <button className={`floating-music ${playing ? "is-playing" : ""}`} onClick={toggleMusic} aria-label={playing ? "暂停悬浮音乐" : "播放悬浮音乐"}><Icon name={playing ? "pause" : "music"}/></button>
+    <button className="scroll-cue" onClick={() => jump("pinned")} aria-label="向下滚动"><Icon name="chevron"/></button>
     <button className={`back-to-top ${showTop ? "visible" : ""}`} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="回到顶部"><Icon name="chevron"/></button>
     {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)}/>} 
   </div>;

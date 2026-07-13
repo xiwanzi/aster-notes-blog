@@ -3,9 +3,7 @@
 import { useEffect, useRef } from "react";
 
 export const wallpapers = [
-  { file: "wallpaper-nocturne.svg", name: "雨夜回廊", tone: "dark" as const },
-  { file: "wallpaper-dawn.svg", name: "晨光站台", tone: "light" as const },
-  { file: "wallpaper-aurora.svg", name: "极光档案馆", tone: "dark" as const },
+  { file: "wallpaper-rain-corridor.webp", name: "雨夜回廊", tone: "dark" as const },
 ];
 
 type ThemeTone = "light" | "dark";
@@ -52,7 +50,7 @@ export function AmbientBackdrop({ wallpaperIndex, tone }: { wallpaperIndex: numb
     let paused = document.hidden;
 
     const colors = tone === "dark"
-      ? { star: "177, 255, 241", link: "91, 222, 207", glow: "79, 237, 215", rain: "210, 255, 248" }
+      ? { star: "235, 244, 246", link: "203, 220, 224", glow: "91, 222, 207", rain: "225, 234, 238" }
       : { star: "255, 255, 255", link: "238, 122, 177", glow: "255, 135, 190", rain: "255, 255, 255" };
 
     const resize = () => {
@@ -112,8 +110,8 @@ export function AmbientBackdrop({ wallpaperIndex, tone }: { wallpaperIndex: numb
 
       if (pointer.active) {
         const glow = context.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, 280);
-        glow.addColorStop(0, `rgba(${colors.glow},.16)`);
-        glow.addColorStop(0.42, `rgba(${colors.glow},.065)`);
+        glow.addColorStop(0, `rgba(${colors.glow},.09)`);
+        glow.addColorStop(0.42, `rgba(${colors.glow},.035)`);
         glow.addColorStop(1, `rgba(${colors.glow},0)`);
         context.fillStyle = glow;
         context.fillRect(pointer.x - 280, pointer.y - 280, 560, 560);
@@ -140,8 +138,8 @@ export function AmbientBackdrop({ wallpaperIndex, tone }: { wallpaperIndex: numb
         }
         if (nearest >= 0) {
           const b = stars[nearest];
-          const pointerLift = pointer.active && Math.hypot(a.x - pointer.x, a.y - pointer.y) < 145 ? 0.18 : 0;
-          context.strokeStyle = `rgba(${colors.link},${0.045 + pointerLift})`;
+          const pointerLift = pointer.active && Math.hypot(a.x - pointer.x, a.y - pointer.y) < 145 ? 0.1 : 0;
+          context.strokeStyle = `rgba(${colors.link},${0.025 + pointerLift})`;
           context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke();
         }
       }
@@ -161,7 +159,7 @@ export function AmbientBackdrop({ wallpaperIndex, tone }: { wallpaperIndex: numb
       context.lineWidth = 1.5;
       drops = drops.filter((drop) => {
         drop.y += drop.speed * delta;
-        context.beginPath(); context.moveTo(drop.x, drop.y - drop.length); context.lineTo(drop.x - 4, drop.y); context.stroke();
+        context.beginPath(); context.moveTo(drop.x, drop.y - drop.length); context.lineTo(drop.x - 1, drop.y); context.stroke();
         if (drop.y >= drop.impact) { addRipple(drop.x, drop.impact, 0.72); return false; }
         return true;
       });
