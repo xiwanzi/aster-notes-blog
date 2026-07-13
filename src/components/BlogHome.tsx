@@ -169,6 +169,7 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
 }
 
 export function BlogHome() {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [blur, setBlur] = useState(true);
   const [playing, setPlaying] = useState(false);
@@ -233,7 +234,7 @@ export function BlogHome() {
     </header>
 
     <main>
-      <section className="hero" aria-labelledby="hero-title">
+      <section className="hero" aria-labelledby="hero-title" style={{ backgroundImage: `url("${basePath}/hero-art.svg")` }}>
         <div className="hero-shade"/>
         <div className="hero-copy">
           <span className="hero-eyebrow">{site.eyebrow}</span>

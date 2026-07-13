@@ -9,12 +9,14 @@ npm install
 npm run dev
 ```
 
-访问 `http://localhost:3000`。生产构建：
+访问 `http://localhost:3000/aster-notes-blog/`。生产构建与静态预览：
 
 ```bash
 npm run build
 npm run start
 ```
+
+线上版本由 GitHub Actions 自动部署至 `https://xiwanzi.github.io/aster-notes-blog/`。
 
 ## 修改内容
 
@@ -43,4 +45,3 @@ docs/architecture.md        架构分析与优化记录
 - 音乐卡片播放状态与进度反馈
 - 平滑锚点导航、阅读进度条与返回顶部
 - 尊重 `prefers-reduced-motion` 的低动态模式
-
