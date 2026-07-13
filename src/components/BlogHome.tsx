@@ -251,7 +251,7 @@ export function BlogHome() {
         </aside>
 
         <div className="main-column">
-          <nav className="archive-strip" aria-label="文章分类"><button className="archive-home"><Icon name="home"/></button><button>归档 <b>{posts.length}</b></button>{categories.slice(0, 3).map((category) => <button key={category.name}>{category.name} <b>{category.count}</b></button>)}<button>更多 <Icon name="arrow" size={14}/></button></nav>
+          <nav className="archive-strip" aria-label="文章分类"><button className="archive-home" aria-label="全部文章"><Icon name="home"/></button><button>归档 <b>{posts.length}</b></button>{categories.slice(0, 3).map((category) => <button key={category.name}>{category.name} <b>{category.count}</b></button>)}<button>更多 <Icon name="arrow" size={14}/></button></nav>
 
           <section className="content-section pinned-section" id="pinned">
             <div className="content-heading"><h2>置顶文章</h2><span>EDITOR&apos;S PICK</span></div>
