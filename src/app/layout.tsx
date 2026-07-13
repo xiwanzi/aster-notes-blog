@@ -18,8 +18,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var r=document.documentElement,m=localStorage.getItem('aster-theme')||'auto',g=localStorage.getItem('aster-blur')!=='false',i=Number(localStorage.getItem('aster-wallpaper')||0),t=['dark','light','dark'][i]||'dark',v=m==='auto'?t:m;r.dataset.theme=v;r.dataset.themeMode=m;r.dataset.wallpaperTone=t;r.classList.add(g?'glass-frosted':'glass-solid');if(!g)r.classList.add('no-blur')}catch(e){document.documentElement.dataset.theme='dark';document.documentElement.dataset.wallpaperTone='dark'}})();` }} />
+      </head>
       <body>{children}</body>
     </html>
   );
 }
-

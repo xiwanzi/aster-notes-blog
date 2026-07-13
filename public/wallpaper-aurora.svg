@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1200" viewBox="0 0 1920 1200" fill="none">
+  <defs>
+    <linearGradient id="sky" x1="960" y1="0" x2="960" y2="1200" gradientUnits="userSpaceOnUse"><stop stop-color="#11182D"/><stop offset=".52" stop-color="#24344A"/><stop offset="1" stop-color="#071317"/></linearGradient>
+    <linearGradient id="aurora" x1="350" y1="50" x2="1550" y2="690" gradientUnits="userSpaceOnUse"><stop stop-color="#2EF2CE" stop-opacity="0"/><stop offset=".26" stop-color="#2EF2CE" stop-opacity=".56"/><stop offset=".52" stop-color="#8A7CFF" stop-opacity=".2"/><stop offset=".74" stop-color="#F77CB9" stop-opacity=".48"/><stop offset="1" stop-color="#F77CB9" stop-opacity="0"/></linearGradient>
+    <radialGradient id="horizon" cx="0" cy="0" r="1" gradientTransform="translate(960 676) rotate(90) scale(410 820)"><stop stop-color="#67E8D5" stop-opacity=".4"/><stop offset="1" stop-color="#67E8D5" stop-opacity="0"/></radialGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="44"/></filter>
+    <pattern id="stars" width="138" height="112" patternUnits="userSpaceOnUse"><circle cx="16" cy="22" r="2" fill="#EAFBF9" fill-opacity=".54"/><circle cx="92" cy="74" r="1.5" fill="#FADAF0" fill-opacity=".46"/><circle cx="132" cy="12" r="1" fill="#fff" fill-opacity=".34"/></pattern>
+  </defs>
+  <rect width="1920" height="1200" fill="url(#sky)"/>
+  <rect width="1920" height="760" fill="url(#stars)"/>
+  <path d="M-120 120c344 212 505 11 805 140 324 140 486 325 780 157 201-115 347-86 575 35" stroke="url(#aurora)" stroke-width="190" stroke-linecap="round" filter="url(#blur)"/>
+  <ellipse cx="960" cy="676" rx="820" ry="410" fill="url(#horizon)"/>
+  <path d="M0 825 194 680l139 87 155-187 184 205 172-276 147 231 144-190 165 232 148-165 190 166 174-112 308 164v375H0V825Z" fill="#0B171C"/>
+  <path d="M0 896c318-64 560-36 766 50 203 85 371 72 564-3 194-76 388-94 590-42v299H0V896Z" fill="#091216"/>
+  <path d="M460 916c170 51 306 109 500 109s330-58 500-109" stroke="#61E5D3" stroke-opacity=".25" stroke-width="5"/>
+  <path d="M889 742h142v244H889z" fill="#0A1116"/><path d="m960 620 134 151H826l134-151Z" fill="#111C24" stroke="#77ECDD" stroke-opacity=".18" stroke-width="3"/>
+  <circle cx="960" cy="738" r="29" fill="#69E0D1" fill-opacity=".3"/><circle cx="960" cy="738" r="12" fill="#D9FFF8" fill-opacity=".72"/>
+  <g fill="#DFFFF9"><circle cx="173" cy="522" r="3"/><circle cx="1549" cy="390" r="4"/><circle cx="1410" cy="183" r="2"/><circle cx="516" cy="341" r="3"/></g>
+</svg>

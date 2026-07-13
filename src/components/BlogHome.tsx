@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { categories, posts, site, tags, type Post } from "@/data/site";
+import { AmbientBackdrop, wallpapers } from "@/components/AmbientBackdrop";
 
 type IconName =
   | "home" | "file" | "user" | "link" | "search" | "music" | "sun" | "moon"
   | "spark" | "menu" | "close" | "arrow" | "clock" | "folder" | "pin"
   | "chart" | "hash" | "calendar" | "mail" | "rss" | "github" | "play"
-  | "pause" | "prev" | "next" | "volume" | "list" | "grid" | "chevron";
+  | "pause" | "prev" | "next" | "volume" | "list" | "grid" | "chevron"
+  | "monitor" | "image";
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {
@@ -40,6 +42,8 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     list: <><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></>,
     grid: <><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></>,
     chevron: <path d="m8 10 4 4 4-4"/>,
+    monitor: <><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></>,
+    image: <><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m3 17 5-4 4 3 3-2 6 5"/></>,
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 }
@@ -74,17 +78,32 @@ function NoticeCard() {
   </section>;
 }
 
-function MusicCard({ playing, onToggle }: { playing: boolean; onToggle: () => void }) {
+const tracks = [
+  { title: "Blue hour", artist: "Aster radio · glass piano", duration: 204 },
+  { title: "Quiet terminal", artist: "Aster radio · soft signal", duration: 228 },
+  { title: "After the rain", artist: "Aster radio · night ambience", duration: 192 },
+];
+
+function formatTime(value: number) {
+  const minutes = Math.floor(value / 60);
+  const seconds = Math.floor(value % 60).toString().padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function MusicCard({ playing, trackIndex, elapsed, onToggle, onPrevious, onNext }: {
+  playing: boolean; trackIndex: number; elapsed: number; onToggle: () => void; onPrevious: () => void; onNext: () => void;
+}) {
+  const track = tracks[trackIndex];
   return <section className="glass-panel music-card">
     <SectionTitle icon="music" title="此刻在听"/>
-    <div className="track"><div className={`album ${playing ? "is-playing" : ""}`}><Icon name="music"/></div><div><b>Blue hour</b><span>Aster radio · ambient mix</span></div></div>
+    <div className="track"><div className={`album ${playing ? "is-playing" : ""}`}><Icon name="music"/></div><div><b>{track.title}</b><span>{track.artist}</span></div></div>
     <div className="player-controls">
-      <button aria-label="上一首"><Icon name="prev"/></button>
+      <button aria-label="上一首" onClick={onPrevious}><Icon name="prev"/></button>
       <button className="play-button" aria-label={playing ? "暂停" : "播放"} onClick={onToggle}><Icon name={playing ? "pause" : "play"}/></button>
-      <button aria-label="下一首"><Icon name="next"/></button>
+      <button aria-label="下一首" onClick={onNext}><Icon name="next"/></button>
     </div>
-    <div className={`track-progress ${playing ? "is-playing" : ""}`}><i/></div>
-    <div className="track-time"><span>0:36</span><span>3:24</span></div>
+    <div className="track-progress"><i style={{ width: `${Math.min(100, elapsed / track.duration * 100)}%` }}/></div>
+    <div className="track-time"><span>{formatTime(elapsed)}</span><span>{formatTime(track.duration)}</span></div>
   </section>;
 }
 
@@ -168,40 +187,138 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
   </div>;
 }
 
+type ThemeMode = "auto" | "light" | "dark";
+type AudioEngine = { context: AudioContext; master: GainNode; oscillators: OscillatorNode[]; track: number };
+
 export function BlogHome() {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<ThemeMode>("auto");
   const [blur, setBlur] = useState(true);
+  const [wallpaperIndex, setWallpaperIndex] = useState(0);
+  const [preferencesReady, setPreferencesReady] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [trackIndex, setTrackIndex] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [typedLine, setTypedLine] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showTop, setShowTop] = useState(false);
+  const audioRef = useRef<AudioEngine | null>(null);
+
+  const resolvedTheme = theme === "auto" ? wallpapers[wallpaperIndex].tone : theme;
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("aster-theme") as "light" | "dark" | null;
+    const savedTheme = localStorage.getItem("aster-theme") as ThemeMode | null;
     const savedBlur = localStorage.getItem("aster-blur");
-    if (savedTheme) setTheme(savedTheme);
+    const savedWallpaper = Number(localStorage.getItem("aster-wallpaper"));
+    if (savedTheme && ["auto", "light", "dark"].includes(savedTheme)) setTheme(savedTheme);
     if (savedBlur) setBlur(savedBlur === "true");
+    if (Number.isInteger(savedWallpaper) && savedWallpaper >= 0 && savedWallpaper < wallpapers.length) setWallpaperIndex(savedWallpaper);
+    setPreferencesReady(true);
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    if (!preferencesReady) return;
+    document.documentElement.dataset.theme = resolvedTheme;
+    document.documentElement.dataset.themeMode = theme;
+    document.documentElement.dataset.wallpaperTone = wallpapers[wallpaperIndex].tone;
+    document.documentElement.classList.toggle("glass-frosted", blur);
+    document.documentElement.classList.toggle("glass-solid", !blur);
     document.documentElement.classList.toggle("no-blur", !blur);
     localStorage.setItem("aster-theme", theme);
     localStorage.setItem("aster-blur", String(blur));
-  }, [theme, blur]);
+    localStorage.setItem("aster-wallpaper", String(wallpaperIndex));
+  }, [blur, preferencesReady, resolvedTheme, theme, wallpaperIndex]);
+
+  useEffect(() => {
+    const phrases = ["Build what you imagine", "Collect what you notice", "Make a home for ideas"];
+    let phraseIndex = 0;
+    let characterIndex = 0;
+    let deleting = false;
+    let timer = 0;
+    const step = () => {
+      const phrase = phrases[phraseIndex];
+      characterIndex += deleting ? -1 : 1;
+      setTypedLine(phrase.slice(0, characterIndex));
+      let delay = deleting ? 38 : 76;
+      if (!deleting && characterIndex === phrase.length) { deleting = true; delay = 2200; }
+      else if (deleting && characterIndex === 0) { deleting = false; phraseIndex = (phraseIndex + 1) % phrases.length; delay = 320; }
+      timer = window.setTimeout(step, delay);
+    };
+    timer = window.setTimeout(step, 420);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const onScroll = () => {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       setScrollProgress(max > 0 ? window.scrollY / max : 0);
-      setShowTop(window.scrollY > 700);
+      setShowTop(window.scrollY >= 360);
     };
+    const onResize = () => window.innerWidth > 900 && setMenuOpen(false);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("resize", onResize);
+    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onResize); };
   }, []);
+
+  useEffect(() => {
+    if (!playing) return;
+    const timer = window.setInterval(() => setElapsed((value) => (value + 1) % tracks[trackIndex].duration), 1000);
+    return () => window.clearInterval(timer);
+  }, [playing, trackIndex]);
+
+  useEffect(() => () => { void audioRef.current?.context.close(); }, []);
+
+  const startAudio = (nextTrack: number) => {
+    const existing = audioRef.current;
+    const context = existing?.context ?? new AudioContext();
+    const master = existing?.master ?? context.createGain();
+    if (!existing) {
+      const filter = context.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 1150;
+      master.gain.value = 0.0001;
+      master.connect(filter).connect(context.destination);
+    }
+    existing?.oscillators.forEach((oscillator) => oscillator.stop());
+    const chords = [[196, 293.66, 392], [174.61, 261.63, 349.23], [220, 329.63, 440]];
+    const oscillators = chords[nextTrack].map((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const voice = context.createGain();
+      oscillator.type = index === 1 ? "triangle" : "sine";
+      oscillator.frequency.value = frequency;
+      oscillator.detune.value = index * 3 - 3;
+      voice.gain.value = index === 0 ? 0.45 : 0.18;
+      oscillator.connect(voice).connect(master);
+      oscillator.start();
+      return oscillator;
+    });
+    master.gain.cancelScheduledValues(context.currentTime);
+    master.gain.setTargetAtTime(0.026, context.currentTime, 0.55);
+    void context.resume();
+    audioRef.current = { context, master, oscillators, track: nextTrack };
+  };
+
+  const toggleMusic = () => {
+    if (playing) {
+      const engine = audioRef.current;
+      if (engine) engine.master.gain.setTargetAtTime(0.0001, engine.context.currentTime, 0.28);
+    } else startAudio(trackIndex);
+    setPlaying((value) => !value);
+  };
+
+  const changeTrack = (direction: number) => {
+    const next = (trackIndex + direction + tracks.length) % tracks.length;
+    setTrackIndex(next);
+    setElapsed(0);
+    if (playing) startAudio(next);
+  };
+
+  const cycleTheme = () => setTheme((value) => value === "auto" ? "light" : value === "light" ? "dark" : "auto");
+  const switchWallpaper = () => setWallpaperIndex((value) => (value + 1) % wallpapers.length);
+  const themeIcon: IconName = theme === "auto" ? "monitor" : theme === "light" ? "sun" : "moon";
+  const themeLabel = theme === "auto" ? "自动主题" : theme === "light" ? "明亮主题" : "暗色主题";
 
   const jump = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
@@ -211,22 +328,24 @@ export function BlogHome() {
   const pinned = posts.filter((post) => post.pinned);
   const recent = posts.filter((post) => !post.pinned);
 
-  return <div className="site-root">
+  return <div className="site-root app-root">
+    <AmbientBackdrop wallpaperIndex={wallpaperIndex} tone={wallpapers[wallpaperIndex].tone}/>
     <div className="scroll-progress" style={{ transform: `scaleX(${scrollProgress})` }}/>
     <header className="topbar-wrap">
       <nav className="topbar" aria-label="主导航">
         <button className="brand" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span className="brand-orbit">{site.mark}</span><b>{site.name}</b></button>
         <div className="desktop-nav">
           <button className="active" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><Icon name="home" size={15}/>首页</button>
-          <details><summary><Icon name="file" size={15}/>文章</summary><div className="nav-dropdown">{categories.map((category) => <button key={category.name} onClick={() => jump("recent")}>{category.name}<span>{category.count}</span></button>)}</div></details>
+          <details><summary><Icon name="file" size={15}/>文章</summary><div className="nav-dropdown"><button onClick={() => jump("recent")}>文章归档<span>{posts.length}</span></button>{categories.map((category) => <button key={category.name} onClick={() => jump("recent")}>{category.name}<span>{category.count}</span></button>)}</div></details>
           <button onClick={() => jump("about")}><Icon name="user" size={15}/>关于</button>
           <button onClick={() => jump("contact")}><Icon name="link" size={15}/>联系</button>
         </div>
         <div className="nav-tools">
-          <button onClick={() => setSearchOpen(true)} aria-label="搜索"><Icon name="search"/></button>
-          <button onClick={() => setPlaying((value) => !value)} aria-label="音乐"><Icon name="music"/></button>
-          <button onClick={() => setTheme((value) => value === "light" ? "dark" : "light")} aria-label="切换主题"><Icon name={theme === "light" ? "sun" : "moon"}/></button>
-          <button className={`blur-switch ${blur ? "active" : ""}`} onClick={() => setBlur((value) => !value)} aria-label="切换磨砂效果"><Icon name="spark"/></button>
+          <button onClick={() => setSearchOpen(true)} aria-label="搜索" title="搜索"><Icon name="search"/></button>
+          <button className={playing ? "active" : ""} onClick={toggleMusic} aria-label={playing ? "暂停音乐" : "播放音乐"} title="环境音乐"><Icon name="music"/></button>
+          <button onClick={cycleTheme} aria-label={`切换主题，当前：${themeLabel}`} title={themeLabel}><Icon name={themeIcon}/></button>
+          <button onClick={switchWallpaper} aria-label={`切换壁纸，当前：${wallpapers[wallpaperIndex].name}`} title={wallpapers[wallpaperIndex].name}><Icon name="image"/></button>
+          <button className={`blur-switch ${blur ? "active" : ""}`} onClick={() => setBlur((value) => !value)} aria-label="切换磨砂效果" title={blur ? "磨砂玻璃" : "纯色玻璃"}><Icon name="spark"/></button>
           <button className="mobile-menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="菜单"><Icon name={menuOpen ? "close" : "menu"}/></button>
         </div>
       </nav>
@@ -234,11 +353,11 @@ export function BlogHome() {
     </header>
 
     <main>
-      <section className="hero" aria-labelledby="hero-title" style={{ backgroundImage: `url("${basePath}/hero-art.svg")` }}>
-        <div className="hero-shade"/>
+      <section className="hero" aria-labelledby="hero-title">
         <div className="hero-copy">
-          <span className="hero-eyebrow">{site.eyebrow}</span>
-          <h1 id="hero-title">{site.headline.split(" ").map((word, index) => <span key={word} data-index={index}>{word}{index < 2 ? " " : ""}</span>)}</h1>
+          <div className="hero-ghost-avatar" aria-hidden="true"><span>{site.mark}</span></div>
+          <h1 id="hero-title"><span>Create</span><em>&amp;</em><span>Chronicle</span></h1>
+          <div className="hero-typewriter" aria-label={typedLine}>{typedLine}<i/></div>
           <p>{site.subheadline}</p>
           <div className="hero-stats"><span><b>94</b>天</span><i/><span><b>{posts.length}</b>篇文章</span><i/><span><b>∞</b>灵感</span></div>
           <div className="hero-actions"><button className="primary-button" onClick={() => jump("pinned")}><Icon name="file"/>浏览文章</button><button className="secondary-button" onClick={() => jump("about")}><Icon name="user"/>关于我</button></div>
@@ -248,7 +367,7 @@ export function BlogHome() {
 
       <div className="site-grid">
         <aside className="left-sidebar" aria-label="作者与分类信息">
-          <ProfileCard/><NoticeCard/><MusicCard playing={playing} onToggle={() => setPlaying((value) => !value)}/><CategoryCard/><TagCard/>
+          <ProfileCard/><NoticeCard/><MusicCard playing={playing} trackIndex={trackIndex} elapsed={elapsed} onToggle={toggleMusic} onPrevious={() => changeTrack(-1)} onNext={() => changeTrack(1)}/><CategoryCard/><TagCard/>
         </aside>
 
         <div className="main-column">
@@ -279,6 +398,7 @@ export function BlogHome() {
       </div>
     </footer>
 
+    <button className={`floating-music ${playing ? "is-playing" : ""}`} onClick={toggleMusic} aria-label={playing ? "暂停悬浮音乐" : "播放悬浮音乐"}><Icon name={playing ? "pause" : "music"}/></button>
     <button className={`back-to-top ${showTop ? "visible" : ""}`} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="回到顶部"><Icon name="chevron"/></button>
     {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)}/>} 
   </div>;
