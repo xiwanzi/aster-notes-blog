@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ResonanceCanvas, type CinematicPhase } from "./ResonanceCanvas";
 
 type Rarity = 3 | 4 | 5;
-type Phase = "idle" | "charging" | "flight" | "burst" | "results";
+type Phase = CinematicPhase;
 type IconName = "spark" | "gem" | "home" | "summon" | "archive" | "info" | "sound" | "mute" | "close" | "skip" | "history" | "user" | "star" | "chevron" | "lock";
 
 type Reward = {
@@ -147,24 +148,46 @@ function RelicGlyph({ id }: { id: string }) {
 }
 
 function ResultCard({ reward, index, visible, onInspect }: { reward: Reward; index: number; visible: boolean; onInspect: () => void }) {
+  const onPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    event.currentTarget.style.setProperty("--card-rotate-y", `${((x - 0.5) * 13).toFixed(2)}deg`);
+    event.currentTarget.style.setProperty("--card-rotate-x", `${((0.5 - y) * 11).toFixed(2)}deg`);
+    event.currentTarget.style.setProperty("--gloss-x", `${(x * 100).toFixed(1)}%`);
+    event.currentTarget.style.setProperty("--gloss-y", `${(y * 100).toFixed(1)}%`);
+  };
+  const resetTilt = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.currentTarget.style.setProperty("--card-rotate-y", "0deg");
+    event.currentTarget.style.setProperty("--card-rotate-x", "0deg");
+    event.currentTarget.style.setProperty("--gloss-x", "50%");
+    event.currentTarget.style.setProperty("--gloss-y", "30%");
+  };
+
   return <button
     className={`result-card rarity-${reward.rarity} ${visible ? "is-visible" : ""}`}
     style={{ "--reveal-index": index, "--card-accent": reward.accent } as React.CSSProperties}
     onClick={onInspect}
+    onPointerMove={onPointerMove}
+    onPointerLeave={resetTilt}
     aria-label={`查看 ${reward.name}，${reward.rarity} 星`}
   >
-    <span className="card-frame"/>
-    <span className="card-glow"/>
-    {reward.image
-      ? <img src={asset(reward.image)} alt="" draggable={false}/>
-      : <RelicGlyph id={reward.id}/>
-    }
-    <span className="card-shade"/>
-    <span className="card-copy">
-      <small>{reward.element}</small>
-      <strong>{reward.name}</strong>
-      {rarityStars(reward.rarity)}
-    </span>
+    <div className="card-surface">
+      <span className="card-back"><Icon name="spark" size={24}/><i/></span>
+      <span className="card-frame"/>
+      <span className="card-glow"/>
+      {reward.image
+        ? <img src={asset(reward.image)} alt="" draggable={false}/>
+        : <RelicGlyph id={reward.id}/>
+      }
+      <span className="card-index">{String(index + 1).padStart(2, "0")}</span>
+      <span className="card-shade"/>
+      <span className="card-copy">
+        <small>{reward.element}</small>
+        <strong>{reward.name}</strong>
+        {rarityStars(reward.rarity)}
+      </span>
+    </div>
   </button>;
 }
 
@@ -172,6 +195,9 @@ export function LumenGacha() {
   const lobbyRef = useRef<HTMLElement>(null);
   const timers = useRef<number[]>([]);
   const audioContext = useRef<AudioContext | null>(null);
+  const launchLocked = useRef(false);
+  const dragStartY = useRef(0);
+  const pullPowerRef = useRef(0);
   const [phase, setPhase] = useState<Phase>("idle");
   const [drawCount, setDrawCount] = useState<1 | 9>(1);
   const [rewards, setRewards] = useState<Reward[]>([]);
@@ -186,6 +212,8 @@ export function LumenGacha() {
   const [history, setHistory] = useState<Reward[]>([]);
   const [toast, setToast] = useState("");
   const [countdown, setCountdown] = useState("16天 08:42:19");
+  const [pullPower, setPullPower] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
 
   const maxRarity = useMemo<Rarity>(() => rewards.reduce<Rarity>((max, reward) => Math.max(max, reward.rarity) as Rarity, 3), [rewards]);
   const overlayOpen = phase !== "idle";
@@ -200,33 +228,64 @@ export function LumenGacha() {
     timers.current.push(timer);
   }, []);
 
-  const playSound = useCallback((kind: "tap" | "charge" | "flight" | "burst" | "flip") => {
+  const playSound = useCallback((kind: "tap" | "charge" | "flight" | "converge" | "burst" | "flip") => {
     if (!sound || typeof window === "undefined") return;
     const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtor) return;
-    const context = audioContext.current ?? new AudioCtor();
-    audioContext.current = context;
+    let context = audioContext.current;
+    if (!context || context.state === "closed") {
+      context = new AudioCtor();
+      audioContext.current = context;
+    }
     if (context.state === "suspended") void context.resume();
     const now = context.currentTime;
     const gain = context.createGain();
     const filter = context.createBiquadFilter();
-    gain.connect(filter).connect(context.destination);
-    filter.type = "lowpass";
-    filter.frequency.setValueAtTime(kind === "burst" ? 5200 : 2600, now);
+    const compressor = context.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-18, now);
+    compressor.knee.setValueAtTime(14, now);
+    compressor.ratio.setValueAtTime(5, now);
+    gain.connect(filter).connect(compressor).connect(context.destination);
+    filter.type = kind === "flight" ? "bandpass" : "lowpass";
+    filter.frequency.setValueAtTime(kind === "burst" ? 6200 : kind === "flight" ? 1350 : 2800, now);
+    filter.Q.setValueAtTime(kind === "flight" ? 0.72 : 0.35, now);
 
-    const notes = kind === "burst" ? [440, 660, 990, 1320] : kind === "flight" ? [170, 255, 382] : kind === "charge" ? [110, 165] : kind === "flip" ? [520, 780] : [420];
+    const notes = kind === "burst" ? [440, 660, 990, 1320, 1760] : kind === "flight" ? [82, 123, 185] : kind === "converge" ? [196, 294, 392, 588] : kind === "charge" ? [110, 165, 220] : kind === "flip" ? [520, 780] : [420];
+    const duration = kind === "burst" ? 1.35 : kind === "flight" ? 1.82 : kind === "converge" ? 0.78 : kind === "charge" ? 1.5 : 0.32;
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(kind === "burst" ? 0.16 : 0.06, now + 0.018);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + (kind === "burst" ? 1.15 : 0.28));
+    gain.gain.exponentialRampToValueAtTime(kind === "burst" ? 0.15 : kind === "flight" ? 0.075 : 0.055, now + 0.018);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
     notes.forEach((frequency, index) => {
       const oscillator = context.createOscillator();
-      oscillator.type = index % 2 ? "triangle" : "sine";
+      oscillator.type = index % 3 === 1 ? "triangle" : "sine";
       oscillator.frequency.setValueAtTime(frequency, now + index * 0.035);
-      if (kind === "flight") oscillator.frequency.exponentialRampToValueAtTime(frequency * 2.4, now + 0.65);
+      if (kind === "flight") oscillator.frequency.exponentialRampToValueAtTime(frequency * 3.4, now + 1.62);
+      if (kind === "charge") oscillator.detune.linearRampToValueAtTime(index % 2 ? 18 : -12, now + 1.3);
+      if (kind === "converge") oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.45, now + 0.62);
       oscillator.connect(gain);
       oscillator.start(now + index * 0.035);
-      oscillator.stop(now + (kind === "burst" ? 1.2 : 0.75));
+      oscillator.stop(now + duration + 0.08);
     });
+
+    if (kind === "flight" || kind === "burst") {
+      const noiseDuration = kind === "flight" ? 1.78 : 0.74;
+      const buffer = context.createBuffer(1, Math.ceil(context.sampleRate * noiseDuration), context.sampleRate);
+      const channel = buffer.getChannelData(0);
+      for (let index = 0; index < channel.length; index += 1) channel[index] = (Math.random() * 2 - 1) * (1 - index / channel.length);
+      const source = context.createBufferSource();
+      const noiseFilter = context.createBiquadFilter();
+      const noiseGain = context.createGain();
+      source.buffer = buffer;
+      noiseFilter.type = kind === "flight" ? "highpass" : "bandpass";
+      noiseFilter.frequency.setValueAtTime(kind === "flight" ? 900 : 1800, now);
+      if (kind === "flight") noiseFilter.frequency.exponentialRampToValueAtTime(4200, now + noiseDuration);
+      noiseGain.gain.setValueAtTime(0.0001, now);
+      noiseGain.gain.exponentialRampToValueAtTime(kind === "flight" ? 0.035 : 0.065, now + 0.05);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + noiseDuration);
+      source.connect(noiseFilter).connect(noiseGain).connect(compressor);
+      source.start(now);
+      source.stop(now + noiseDuration);
+    }
   }, [sound]);
 
   const showToast = useCallback((message: string) => {
@@ -236,13 +295,40 @@ export function LumenGacha() {
 
   const finishToResults = useCallback((items: Reward[]) => {
     clearTimers();
+    launchLocked.current = false;
+    setIsPulling(false);
+    pullPowerRef.current = 0;
+    setPullPower(0);
     setPhase("results");
     setRevealCount(0);
     items.forEach((_, index) => later(() => {
       setRevealCount(index + 1);
       if (index < 4 || index === items.length - 1) playSound("flip");
-    }, 120 + index * (items.length === 1 ? 0 : 170)));
+    }, 180 + index * (items.length === 1 ? 0 : 135 + Math.min(index, 4) * 7)));
   }, [clearTimers, later, playSound]);
+
+  const launchFromGate = useCallback((items: Reward[]) => {
+    if (launchLocked.current || !items.length) return;
+    launchLocked.current = true;
+    clearTimers();
+    setIsPulling(false);
+    setPullPower(1);
+    setPhase("flight");
+    playSound("flight");
+    navigator.vibrate?.(18);
+
+    later(() => {
+      setPhase("converge");
+      playSound("converge");
+    }, 1720);
+    later(() => {
+      const batchMaxRarity = items.reduce<Rarity>((max, item) => Math.max(max, item.rarity) as Rarity, 3);
+      setPhase("burst");
+      playSound("burst");
+      navigator.vibrate?.(batchMaxRarity === 5 ? [24, 36, 68] : batchMaxRarity === 4 ? [24, 28, 38] : 24);
+    }, 2440);
+    later(() => finishToResults(items), 3740);
+  }, [clearTimers, finishToResults, later, playSound]);
 
   const summon = useCallback((count: 1 | 9) => {
     const cost = count === 1 ? 160 : 1280;
@@ -265,8 +351,6 @@ export function LumenGacha() {
       const guaranteed = { ...pick(FOUR_STAR) };
       items[items.length - 1] = { ...guaranteed, id: `${guaranteed.id}-${Date.now()}-guaranteed` };
     }
-    const batchMaxRarity = items.reduce<Rarity>((max, item) => Math.max(max, item.rarity) as Rarity, 3);
-
     setCurrency((value) => value - cost);
     setPity(nextPity);
     setHasSummoned(true);
@@ -275,6 +359,10 @@ export function LumenGacha() {
     setHistory((current) => [...items, ...current].slice(0, 36));
     setRevealCount(0);
     setFocused(null);
+    launchLocked.current = false;
+    pullPowerRef.current = 0;
+    setPullPower(0);
+    setIsPulling(false);
     setPhase("charging");
     playSound("charge");
 
@@ -284,23 +372,45 @@ export function LumenGacha() {
       return;
     }
 
-    later(() => {
-      setPhase("flight");
-      playSound("flight");
-    }, 920);
-    later(() => {
-      setPhase("burst");
-      playSound("burst");
-      navigator.vibrate?.(batchMaxRarity === 5 ? [30, 45, 70] : [35]);
-    }, 2180);
-    later(() => finishToResults(items), 3450);
-  }, [clearTimers, currency, finishToResults, hasSummoned, later, pity, playSound, showToast]);
+    later(() => launchFromGate(items), 1650);
+  }, [clearTimers, currency, finishToResults, hasSummoned, later, launchFromGate, pity, playSound, showToast]);
 
   const skip = useCallback(() => {
     if (!rewards.length || phase === "results") return;
     playSound("tap");
     finishToResults(rewards);
   }, [finishToResults, phase, playSound, rewards]);
+
+  const startCorePull = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (phase !== "charging") return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragStartY.current = event.clientY;
+    pullPowerRef.current = Math.max(0.08, pullPowerRef.current);
+    setPullPower(pullPowerRef.current);
+    setIsPulling(true);
+    playSound("tap");
+  }, [phase, playSound]);
+
+  const moveCorePull = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isPulling || phase !== "charging") return;
+    const distance = Math.max(0, dragStartY.current - event.clientY);
+    const nextPower = Math.min(1, distance / 104);
+    pullPowerRef.current = nextPower;
+    setPullPower(nextPower);
+  }, [isPulling, phase]);
+
+  const releaseCorePull = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isPulling || phase !== "charging") return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setIsPulling(false);
+    if (pullPowerRef.current >= 0.46) {
+      navigator.vibrate?.(16);
+      launchFromGate(rewards);
+      return;
+    }
+    pullPowerRef.current = 0;
+    setPullPower(0);
+  }, [isPulling, launchFromGate, phase, rewards]);
 
   const closeResults = useCallback(() => {
     clearTimers();
@@ -359,6 +469,23 @@ export function LumenGacha() {
     const y = (event.clientY / window.innerHeight - 0.5) * 2;
     lobbyRef.current?.style.setProperty("--pointer-x", x.toFixed(3));
     lobbyRef.current?.style.setProperty("--pointer-y", y.toFixed(3));
+    lobbyRef.current?.style.setProperty("--pointer-px", `${event.clientX.toFixed(1)}px`);
+    lobbyRef.current?.style.setProperty("--pointer-py", `${event.clientY.toFixed(1)}px`);
+  };
+
+  const onCinematicMove = (event: React.PointerEvent<HTMLElement>) => {
+    const x = (event.clientX / window.innerWidth - 0.5) * 2;
+    const y = (event.clientY / window.innerHeight - 0.5) * 2;
+    event.currentTarget.style.setProperty("--cinematic-x", x.toFixed(3));
+    event.currentTarget.style.setProperty("--cinematic-y", y.toFixed(3));
+  };
+
+  const onShowcaseMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width - 0.5;
+    const y = (event.clientY - rect.top) / rect.height - 0.5;
+    event.currentTarget.style.setProperty("--showcase-x", x.toFixed(3));
+    event.currentTarget.style.setProperty("--showcase-y", y.toFixed(3));
   };
 
   return <main className="gacha-lobby" ref={lobbyRef} onPointerMove={onParallax} style={{ "--lobby-bg": `url("${asset("lumen-gate.webp")}")` } as React.CSSProperties}>
@@ -366,9 +493,11 @@ export function LumenGacha() {
       <div className="scene-image"/>
       <div className="scene-aurora"/>
       <div className="scene-grid"/>
+      {!overlayOpen && <ResonanceCanvas phase="idle" rarity={5} className="lobby-particle-canvas"/>}
       <div className="star-field">{STARS.map((star, index) => <i key={index} style={{ left: star.left, top: star.top, width: star.size, height: star.size, animationDelay: star.delay }}/>)}</div>
       <div className="scene-vignette"/>
     </div>
+    <div className="pointer-reactor" aria-hidden="true"><i/><span/></div>
 
     <header className="game-header">
       <a className="game-logo" href="#main-banner" aria-label="星汐回响首页">
@@ -409,11 +538,11 @@ export function LumenGacha() {
         <small>九连必得四星或以上 · 首次共鸣必得五星</small>
       </div>
       <div className="summon-actions">
-        <button className="summon-button single" onClick={() => summon(1)}>
+        <button className="summon-button single" onClick={() => summon(1)} data-count="01">
           <span><small>共鸣一次</small><b>单次观测</b></span>
           <i><Icon name="gem" size={16}/>160</i>
         </button>
-        <button className="summon-button multi" onClick={() => summon(9)}>
+        <button className="summon-button multi" onClick={() => summon(9)} data-count="09">
           <span className="button-shine"/>
           <span><small>九重共鸣</small><b>连续观测 × 9</b></span>
           <i><Icon name="gem" size={16}/>1,280</i>
@@ -424,24 +553,48 @@ export function LumenGacha() {
     <div className="banner-dots" aria-label="卡池切换"><button className="active" aria-label="当前卡池"/><button onClick={() => showToast("下一期共鸣尚未开启")} aria-label="下一卡池"/><button onClick={() => showToast("常驻共鸣尚未开启")} aria-label="常驻卡池"/></div>
     <div className="legal-note">本页面仅为原创抽卡动画模拟，不含充值与真实交易</div>
 
-    {overlayOpen && <section className={`summon-overlay phase-${phase} rarity-${maxRarity}`} role="dialog" aria-modal="true" aria-label="共鸣动画">
+    {overlayOpen && <section
+      className={`summon-overlay phase-${phase} rarity-${maxRarity} ${isPulling ? "is-pulling" : ""}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label="共鸣动画"
+      onPointerMove={onCinematicMove}
+      style={{ "--pull-power": pullPower, "--pull-offset": `${(-pullPower * 88).toFixed(1)}px`, "--pull-percent": `${(pullPower * 100).toFixed(1)}%` } as React.CSSProperties}
+    >
       {phase !== "results" && <>
         <button className="skip-button" onClick={skip}><Icon name="skip" size={17}/>跳过</button>
-        <div className="summon-space" aria-hidden="true">
+        <div className="cinematic-bars" aria-hidden="true"><i/><i/></div>
+        <div className="sequence-readout" aria-hidden="true"><span>RESONANCE / {drawCount === 9 ? "Σ-09" : "Σ-01"}</span><b>星门同步协议</b><i><em/></i></div>
+        <div className="summon-space">
+          <ResonanceCanvas phase={phase} rarity={maxRarity}/>
+          <div className="lens-field" aria-hidden="true"><i/><b/><span/></div>
           <div className="space-stars">{STARS.map((star, index) => <i key={index} style={{ left: star.left, top: star.top, width: star.size, height: star.size, animationDelay: star.delay }}/>)}</div>
-          <div className="gate-rings"><i/><i/><i/><b/><span/></div>
-          <div className="summon-core"><i/><b/><span/></div>
-          <div className="comet"><i/><b/><span/></div>
-          <div className="motes">{MOTES.map((mote, index) => <i key={index} style={{ "--mote-angle": mote.angle, "--mote-delay": mote.delay, "--mote-distance": mote.distance } as React.CSSProperties}/>)}</div>
-          <div className="burst-sigil"><Icon name="spark" size={88}/><span>{maxRarity === 5 ? "命运相位已确认" : maxRarity === 4 ? "高阶回响" : "标准回响"}</span></div>
-          <div className="screen-flash"/>
+          <div className="gate-rings" aria-hidden="true"><i/><i/><i/><b/><span/><em/></div>
+          <div className="charge-tether" aria-hidden="true"><i/><b/></div>
+          <button
+            className="summon-core"
+            onPointerDown={startCorePull}
+            onPointerMove={moveCorePull}
+            onPointerUp={releaseCorePull}
+            onPointerCancel={releaseCorePull}
+            onClick={() => phase === "charging" && launchFromGate(rewards)}
+            aria-label="向上牵引星核并松手，启动共鸣"
+          ><i/><b/><span/><em><Icon name="spark" size={28}/></em></button>
+          <div className="core-instruction" aria-hidden="true"><span>{isPulling ? "保持牵引" : "向上牵引星核"}</span><i><b/></i><small>松手启动 · 亦可轻触跳过校准</small></div>
+          <div className="comet" aria-hidden="true"><i/><b/><span/><em/></div>
+          <div className="motes" aria-hidden="true">{MOTES.map((mote, index) => <i key={index} style={{ "--mote-angle": mote.angle, "--mote-delay": mote.delay, "--mote-distance": mote.distance } as React.CSSProperties}/>)}</div>
+          <div className="burst-sigil" aria-hidden="true"><div className="sigil-orbit"><i/><b/><span/></div><Icon name="spark" size={88}/><span>{maxRarity === 5 ? "命运相位已确认" : maxRarity === 4 ? "高阶回响" : "标准回响"}</span><small>{maxRarity === 5 ? "FIVE-STAR RESONANCE" : maxRarity === 4 ? "ADVANCED RESONANCE" : "STANDARD RESONANCE"}</small></div>
+          <div className="screen-flash" aria-hidden="true"/>
+          <div className="film-grain" aria-hidden="true"/>
         </div>
-        <div className="summon-caption"><span>RESONANCE SEQUENCE</span><b>{phase === "charging" ? "正在校准星门" : phase === "flight" ? "穿越折光航道" : "捕获回响"}</b></div>
+        <div className="summon-caption"><span>RESONANCE SEQUENCE</span><b>{phase === "charging" ? "正在校准星门" : phase === "flight" ? "穿越折光航道" : phase === "converge" ? "信号正在聚合" : "捕获回响"}</b></div>
+        <div className="sequence-progress" aria-hidden="true"><i className={phase === "charging" ? "active" : "done"}/><i className={phase === "flight" ? "active" : phase === "converge" || phase === "burst" ? "done" : ""}/><i className={phase === "converge" ? "active" : phase === "burst" ? "done" : ""}/><i className={phase === "burst" ? "active" : ""}/></div>
       </>}
 
       {phase === "results" && <div className={`results-screen ${drawCount === 1 ? "single-result" : "multi-result"}`}>
+        <ResonanceCanvas phase="results" rarity={maxRarity} className="results-particle-canvas"/>
         <div className="results-topline"><span>RESONANCE RESULT</span><b>共鸣结果</b></div>
-        {drawCount === 1 ? <div className={`single-showcase rarity-${rewards[0]?.rarity ?? 3}`}>
+        {drawCount === 1 ? <div className={`single-showcase rarity-${rewards[0]?.rarity ?? 3}`} onPointerMove={onShowcaseMove}>
           <div className="single-rays"/>
           <div className="single-art">
             {rewards[0]?.image ? <img src={asset(rewards[0].image)} alt={rewards[0].name}/> : <RelicGlyph id={rewards[0]?.id.split("-").slice(0, -2).join("-") || "beacon"}/>} 
