@@ -1,6 +1,5 @@
-import { BlogHome } from "@/components/BlogHome";
+import { LumenGacha } from "@/components/LumenGacha";
 
 export default function Home() {
-  return <BlogHome />;
+  return <LumenGacha />;
 }
-
